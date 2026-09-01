@@ -1,5 +1,3 @@
-// android/app/src/main/kotlin/com/example/netscope/NetworkStatsReader.kt
-
 package com.example.netscope
 
 import android.app.AppOpsManager
@@ -8,8 +6,9 @@ import android.app.usage.NetworkStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Process
-import java.util.Calendar
 
 object NetworkStatsReader {
 
@@ -30,18 +29,21 @@ object NetworkStatsReader {
     fun getSnapshot(context: Context): Map<String, Any> {
         val apps = getApplicationUsage(context)
 
-        var rx = 0L
-        var tx = 0L
+        var totalRxBytes = 0L
+        var totalTxBytes = 0L
 
-        apps.forEach {
-            rx += (it["rxBytes"] as Number).toLong()
-            tx += (it["txBytes"] as Number).toLong()
+        for (app in apps) {
+            totalRxBytes +=
+                (app["rxBytes"] as Number).toLong()
+
+            totalTxBytes +=
+                (app["txBytes"] as Number).toLong()
         }
 
         return mapOf(
             "timestamp" to System.currentTimeMillis(),
-            "totalRxBytes" to rx,
-            "totalTxBytes" to tx,
+            "totalRxBytes" to totalRxBytes,
+            "totalTxBytes" to totalTxBytes,
             "apps" to apps
         )
     }
@@ -54,185 +56,179 @@ object NetworkStatsReader {
             return emptyList()
         }
 
-        val manager =
+        val networkStatsManager =
             context.getSystemService(
                 Context.NETWORK_STATS_SERVICE
             ) as NetworkStatsManager
 
         val packageManager = context.packageManager
 
-        val now = System.currentTimeMillis()
+        val endTime = System.currentTimeMillis()
 
-        val calendar = Calendar.getInstance()
-
-        calendar.add(Calendar.DAY_OF_YEAR, -1)
-
-        val start = calendar.timeInMillis
+        /*
+         * Keep the same 24-hour monitoring window used by the
+         * original implementation.
+         */
+        val startTime =
+            endTime - (24L * 60L * 60L * 1000L)
 
         val applications =
             packageManager.getInstalledApplications(
                 android.content.pm.PackageManager.GET_META_DATA
             )
 
-        val result = mutableListOf<Map<String, Any>>()
+        val result =
+            mutableListOf<Map<String, Any>>()
 
         for (application in applications) {
 
-            if (application.uid < 0) {
+            val uid = application.uid
+
+            if (uid < 0) {
                 continue
             }
 
-            if ((application.flags and ApplicationInfo.FLAG_SYSTEM) != 0) {
+            /*
+             * Skip the NetScope application itself.
+             */
+            if (application.packageName ==
+                context.packageName
+            ) {
                 continue
             }
 
-            var rxBytes = 0L
-            var txBytes = 0L
+            /*
+             * queryDetailsForUid() is available for
+             * application-specific usage statistics.
+             *
+             * We query Wi-Fi and mobile separately.
+             */
+            val wifi =
+                queryUid(
+                    networkStatsManager,
+                    ConnectivityManager.TYPE_WIFI,
+                    uid,
+                    startTime,
+                    endTime
+                )
 
-            rxBytes += queryUid(
-                manager,
-                ConnectivityManager.TYPE_WIFI,
-                application.uid,
-                start,
-                now
-            )
+            val mobile =
+                queryUid(
+                    networkStatsManager,
+                    ConnectivityManager.TYPE_MOBILE,
+                    uid,
+                    startTime,
+                    endTime
+                )
 
-            txBytes += queryUidTx(
-                manager,
-                ConnectivityManager.TYPE_WIFI,
-                application.uid,
-                start,
-                now
-            )
+            val rxBytes =
+                wifi.rxBytes + mobile.rxBytes
 
-            rxBytes += queryUid(
-                manager,
-                ConnectivityManager.TYPE_MOBILE,
-                application.uid,
-                start,
-                now
-            )
-
-            txBytes += queryUidTx(
-                manager,
-                ConnectivityManager.TYPE_MOBILE,
-                application.uid,
-                start,
-                now
-            )
+            val txBytes =
+                wifi.txBytes + mobile.txBytes
 
             if (rxBytes == 0L && txBytes == 0L) {
                 continue
             }
 
-            val label = try {
-                packageManager.getApplicationLabel(
-                    application
-                ).toString()
-            } catch (_: Exception) {
-                application.packageName
-            }
+            val appName =
+                try {
+                    packageManager
+                        .getApplicationLabel(application)
+                        .toString()
+                } catch (_: Exception) {
+                    application.packageName
+                }
 
             result.add(
                 mapOf(
                     "packageName" to application.packageName,
-                    "appName" to label,
-                    "uid" to application.uid,
+                    "appName" to appName,
+                    "uid" to uid,
                     "rxBytes" to rxBytes,
                     "txBytes" to txBytes
                 )
             )
         }
 
-        return result.sortedByDescending {
-            (it["rxBytes"] as Number).toLong() +
-                    (it["txBytes"] as Number).toLong()
+        return result.sortedByDescending { app ->
+
+            val rx =
+                (app["rxBytes"] as Number).toLong()
+
+            val tx =
+                (app["txBytes"] as Number).toLong()
+
+            rx + tx
         }
     }
+
+    private data class UsageResult(
+        val rxBytes: Long = 0L,
+        val txBytes: Long = 0L
+    )
 
     private fun queryUid(
         manager: NetworkStatsManager,
-        type: Int,
+        networkType: Int,
         uid: Int,
-        start: Long,
-        end: Long
-    ): Long {
+        startTime: Long,
+        endTime: Long
+    ): UsageResult {
 
         return try {
 
-            val template =
-                if (type == ConnectivityManager.TYPE_WIFI) {
-                    android.net.NetworkTemplate.buildTemplateWifiWildcard()
+            /*
+             * IMPORTANT:
+             *
+             * Do not use NetworkTemplate here.
+             *
+             * NetworkStatsManager.queryDetailsForUid()
+             * expects the network type as an Int on the
+             * Android API used by this project.
+             */
+
+            val stats =
+                if (Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.M
+                ) {
+                    manager.queryDetailsForUid(
+                        networkType,
+                        null,
+                        startTime,
+                        endTime,
+                        uid
+                    )
                 } else {
-                    android.net.NetworkTemplate.buildTemplateMobileWildcard()
+                    return UsageResult()
                 }
 
-            val stats: NetworkStats =
-                manager.queryDetailsForUid(
-                    template,
-                    start,
-                    end,
-                    uid
-                )
+            val bucket =
+                NetworkStats.Bucket()
 
-            val bucket = NetworkStats.Bucket()
-
-            var total = 0L
+            var rxBytes = 0L
+            var txBytes = 0L
 
             while (stats.hasNextBucket()) {
+
                 stats.getNextBucket(bucket)
-                total += bucket.rxBytes
+
+                rxBytes += bucket.rxBytes
+                txBytes += bucket.txBytes
             }
 
             stats.close()
 
-            total
+            UsageResult(
+                rxBytes = rxBytes,
+                txBytes = txBytes
+            )
+
+        } catch (_: SecurityException) {
+            UsageResult()
 
         } catch (_: Exception) {
-            0L
-        }
-    }
-
-    private fun queryUidTx(
-        manager: NetworkStatsManager,
-        type: Int,
-        uid: Int,
-        start: Long,
-        end: Long
-    ): Long {
-
-        return try {
-
-            val template =
-                if (type == ConnectivityManager.TYPE_WIFI) {
-                    android.net.NetworkTemplate.buildTemplateWifiWildcard()
-                } else {
-                    android.net.NetworkTemplate.buildTemplateMobileWildcard()
-                }
-
-            val stats: NetworkStats =
-                manager.queryDetailsForUid(
-                    template,
-                    start,
-                    end,
-                    uid
-                )
-
-            val bucket = NetworkStats.Bucket()
-
-            var total = 0L
-
-            while (stats.hasNextBucket()) {
-                stats.getNextBucket(bucket)
-                total += bucket.txBytes
-            }
-
-            stats.close()
-
-            total
-
-        } catch (_: Exception) {
-            0L
+            UsageResult()
         }
     }
 }

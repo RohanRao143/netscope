@@ -1,4 +1,13 @@
 // android/app/build.gradle.kts
+import java.io.FileInputStream
+import java.util.Properties
+
+// 1. Read the properties file at the top of your build.gradle.kts
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
 
 plugins {
     id("com.android.application")
@@ -7,15 +16,32 @@ plugins {
 }
 
 android {
-    namespace = "com.example.netscope"
+    namespace = "com.alphaagentssuite.netscope"
     compileSdk = flutter.compileSdkVersion
 
     defaultConfig {
-        applicationId = "com.example.netscope"
+        applicationId = "com.alphaagentssuite.netscope"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProperties["storeFile"] as? String
+            storeFile = if (!storeFilePath.isNullOrEmpty()) file(storeFilePath) else null
+            storePassword = keystoreProperties["storePassword"] as? String
+            keyAlias = keystoreProperties["keyAlias"] as? String
+            keyPassword = keystoreProperties["keyPassword"] as? String
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            // 3. Assign the release signing config
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     compileOptions {
