@@ -9,7 +9,7 @@ final class NetworkMonitor {
 
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(
-        label: "com.example.netscope.network"
+        label: "com.alphaagentssuite.netscope.network"
     )
 
     private(set) var isConnected = false

@@ -1,6 +1,6 @@
 // android/app/src/main/kotlin/com/example/netscope/NetScopeVpnService.kt
 
-package com.example.netscope
+package com.alphaagentssuite.netscope
 
 import android.content.Intent
 import android.net.VpnService

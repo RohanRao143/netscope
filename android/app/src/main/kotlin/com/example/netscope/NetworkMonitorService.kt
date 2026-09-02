@@ -1,6 +1,6 @@
 // android/app/src/main/kotlin/com/example/netscope/NetworkMonitorService.kt
 
-package com.example.netscope
+package com.alphaagentssuite.netscope
 
 import android.app.Notification
 import android.app.NotificationChannel

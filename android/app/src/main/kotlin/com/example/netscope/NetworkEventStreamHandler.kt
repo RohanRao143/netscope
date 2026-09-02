@@ -1,6 +1,6 @@
 // android/app/src/main/kotlin/com/example/netscope/NetworkEventStreamHandler.kt
 
-package com.example.netscope
+package com.alphaagentssuite.netscope
 
 import android.content.Context
 import android.os.Handler

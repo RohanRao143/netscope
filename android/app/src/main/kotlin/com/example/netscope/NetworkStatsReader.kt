@@ -1,4 +1,4 @@
-package com.example.netscope
+package com.alphaagentssuite.netscope
 
 import android.app.AppOpsManager
 import android.app.usage.NetworkStats
