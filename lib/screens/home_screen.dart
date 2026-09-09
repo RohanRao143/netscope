@@ -9,7 +9,7 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/app_usage_tile.dart';
 import '../widgets/network_status_chip.dart';
 import '../widgets/usage_card.dart';
-import 'details_screen.dart';
+import '../widgets/advanced_analytics_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -77,9 +77,9 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                UsageCard(
-                  snapshot: provider.snapshot,
-                ),
+                UsageCard(snapshot: provider.snapshot),
+                const SizedBox(height: 12),
+                AdvancedAnalyticsCard(analytics: provider.analytics, hosts: provider.hostStats),
                 const SizedBox(height: 20),
                 Text(
                   'Top applications',
@@ -87,19 +87,7 @@ class HomeScreen extends StatelessWidget {
                       Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 10),
-                ...provider.apps.take(5).map(
-                  (app) => GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              DetailsScreen(app: app),
-                        ),
-                      );
-                    },
-                    child: AppUsageTile(app: app),
-                  ),
-                ),
+                ...provider.apps.take(5).map((app) => AppUsageTile(app: app)),
               ],
             ),
           ),

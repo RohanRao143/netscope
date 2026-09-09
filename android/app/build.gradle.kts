@@ -18,6 +18,7 @@ plugins {
 android {
     namespace = "com.alphaagentssuite.netscope"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.alphaagentssuite.netscope"

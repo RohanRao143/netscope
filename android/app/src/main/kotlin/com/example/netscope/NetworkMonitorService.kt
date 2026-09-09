@@ -63,6 +63,9 @@ class NetworkMonitorService : Service() {
 
                 val snapshot =
                     NetworkStatsReader.getSnapshot(this@NetworkMonitorService)
+                @Suppress("UNCHECKED_CAST")
+                val apps = snapshot["apps"] as? List<Map<String,Any>> ?: emptyList()
+                UsageAlertManager.check(this@NetworkMonitorService, apps)
 
                 NetworkEventStreamHandler.emit(snapshot)
 

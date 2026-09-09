@@ -1,12 +1,9 @@
-// lib/screens/history_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import '../core/providers/network_provider.dart';
 import '../core/services/format_service.dart';
 import '../core/services/history_service.dart';
+import 'history_detail_screen.dart';
 import '../widgets/app_scaffold.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -19,53 +16,63 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
-    return Consumer<NetworkProvider>(
-      builder: (context, provider, _) {
-        final history = HistoryService.history;
+    final history = HistoryService.history;
 
-        return AppScaffold(
-          title: 'History',
-          actions: [
-            if (history.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () {
-                  HistoryService.clear();
-                  setState(() {});
-                },
-              ),
-          ],
-          body: history.isEmpty
-              ? const Center(
-                  child: Text('No network history recorded yet.'),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  itemCount: history.length,
-                  itemBuilder: (context, index) {
-                    final item = history[index];
+    return AppScaffold(
+      title: 'History',
+      actions: [
+        if (history.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Clear history',
+            onPressed: () async {
+              await HistoryService.clear();
 
-                    return Card(
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.network_check),
+              if (mounted) {
+                setState(() {});
+              }
+            },
+          ),
+      ],
+      body: history.isEmpty
+          ? const Center(
+              child: Text('No network history recorded yet.'),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              itemCount: history.length,
+              itemBuilder: (context, index) {
+                final item = history[index];
+
+                return Card(
+                  child: ListTile(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => HistoryDetailScreen(
+                            timestamp: item.timestamp,
+                          ),
                         ),
-                        title: Text(
-                          FormatService.bytes(item.totalBytes),
-                        ),
-                        subtitle: Text(
-                          '↓ ${FormatService.bytes(item.rxBytes)}   '
-                          '↑ ${FormatService.bytes(item.txBytes)}',
-                        ),
-                        trailing: Text(
-                          DateFormat('HH:mm:ss').format(item.timestamp),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        );
-      },
+                      );
+                    },
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.network_check),
+                    ),
+                    title: Text(
+                      FormatService.bytes(item.totalBytes),
+                    ),
+                    subtitle: Text(
+                      '↓ ${FormatService.bytes(item.rxBytes)}   '
+                      '↑ ${FormatService.bytes(item.txBytes)}',
+                    ),
+                    trailing: Text(
+                      DateFormat('HH:mm:ss').format(item.timestamp),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
